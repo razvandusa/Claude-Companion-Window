@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Claude Companion</string>
+	<key>CFBundleExecutable</key>
+	<string>ClaudeCompanion</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.claudecompanion.app</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Claude Companion</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<!-- Accessory app: no Dock icon and no menu bar. The only surface is the
+	     floating panel, opened with the global shortcut or the status item. -->
+	<key>LSUIElement</key>
+	<true/>
+	<!-- "Take photo" in the composer's + menu. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Claude Companion uses the camera when you choose "Take photo", so the picture can be attached to your message.</string>
+	<!-- The mic button dictates into the composer. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Claude Companion uses the microphone to dictate your message.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Claude Companion transcribes what you dictate into the composer.</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Claude Companion</string>
+	<key>NSSupportsAutomaticTermination</key>
+	<false/>
+	<key>NSSupportsSuddenTermination</key>
+	<false/>
+</dict>
+</plist>
