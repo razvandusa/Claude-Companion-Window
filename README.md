@@ -59,7 +59,7 @@ when the CLI reports them mid-turn.
 | Area | Notes |
 | --- | --- |
 | Window | `NSPanel`, `.floating`, joins all Spaces, appears over full-screen apps, rounded + `NSVisualEffectView` material, hides rather than closes, remembers frame |
-| Dismissal | ESC (cancels a running response first, then dismisses), ⌘W, optional click-outside |
+| Dismissal | ESC (cancels a running response first, then dismisses), ⌘W, the hotkey, or the ✕ — the panel stays put when you click into another app unless "Dismiss when clicking outside" is turned on |
 | Shortcut | `KeyboardShortcuts` by Sindre Sorhus, default ⌥Space, rebindable in Settings |
 | Streaming | Newline-delimited JSON from a `claude` child process, `AsyncThrowingStream`, cancellable (cancelling terminates the process) |
 | History | Held by Claude Code: the first turn creates a session, later turns `--resume` it, so only the new message crosses the pipe |

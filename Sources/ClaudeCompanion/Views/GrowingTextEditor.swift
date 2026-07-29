@@ -50,6 +50,10 @@ struct GrowingTextEditor: NSViewRepresentable {
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
         textView.textContainer?.widthTracksTextView = true
+        // NSTextContainer pads every line fragment by 5pt, which would sit the
+        // caret and the typed text to the right of the SwiftUI placeholder
+        // drawn behind them.
+        textView.textContainer?.lineFragmentPadding = 0
         textView.setAccessibilityLabel("Message Claude")
 
         let scrollView = NSScrollView()

@@ -56,6 +56,8 @@ struct TranscriptView: View {
                     .padding(.horizontal, Theme.Metrics.horizontalPadding)
                     .padding(.vertical, 14)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    // Inside the content on purpose — see the type's note.
+                    .background { OverlayScrollerConfigurator() }
                 }
                 .coordinateSpace(name: "transcript")
                 .onPreferenceChange(BottomOffsetKey.self) { value in
@@ -111,6 +113,59 @@ struct TranscriptView: View {
                 proxy.scrollTo(bottomAnchor, anchor: .bottom)
             }
         }
+    }
+}
+
+/// Strips the slot from the transcript's scrollbar.
+///
+/// With "Show scroll bars: Always" set in System Settings, AppKit gives the
+/// scroll view a *legacy* scroller: a knob riding in a drawn slot. Over a
+/// translucent panel that slot reads as a grey box glued to the right edge.
+///
+/// Asking for the overlay style is not enough on its own — AppKit restores the
+/// legacy style from the system preference — so the scroller is also replaced
+/// with one that declines to draw its slot. The knob, and all of its normal
+/// drag behaviour, are untouched.
+///
+/// Must be mounted *inside* the scroll content: as a background on the
+/// `ScrollView` itself the probe is a sibling of the scroll view, and
+/// `enclosingScrollView` would find nothing.
+private struct OverlayScrollerConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let probe = NSView(frame: .zero)
+        // Deferred: the view has no enclosing scroll view until SwiftUI has
+        // put it in the hierarchy.
+        DispatchQueue.main.async { configure(from: probe) }
+        return probe
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async { configure(from: view) }
+    }
+
+    private func configure(from view: NSView) {
+        guard let scrollView = view.enclosingScrollView else { return }
+
+        scrollView.scrollerStyle = .overlay
+        scrollView.autohidesScrollers = true
+        scrollView.drawsBackground = false
+        scrollView.backgroundColor = .clear
+
+        if !(scrollView.verticalScroller is SlotlessScroller) {
+            let scroller = SlotlessScroller()
+            scroller.controlSize = .small
+            scrollView.verticalScroller = scroller
+        }
+        scrollView.hasVerticalScroller = true
+    }
+}
+
+/// Scroller that draws its knob but not the slot behind it.
+private final class SlotlessScroller: NSScroller {
+    override class var isCompatibleWithOverlayScrollers: Bool { true }
+
+    override func drawKnobSlot(in slotRect: NSRect, highlight flag: Bool) {
+        // Intentionally empty: the panel is the background.
     }
 }
 

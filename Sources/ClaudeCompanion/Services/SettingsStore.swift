@@ -32,7 +32,10 @@ final class SettingsStore: ObservableObject {
             Key.thinkingEnabled: true,
             Key.maxTokens: 16_000,
             Key.systemPrompt: "",
-            Key.dismissOnClickOutside: true,
+            // Off by default: the panel is meant to sit above whatever you're
+            // working in, and clicking into that app to read something is not
+            // a request to dismiss it. ESC, ⌘W and the hotkey still close it.
+            Key.dismissOnClickOutside: false,
             Key.launchAtLogin: false,
             Key.showTokenUsage: true,
             Key.webSearchEnabled: false,

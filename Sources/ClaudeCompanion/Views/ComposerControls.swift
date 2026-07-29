@@ -1,27 +1,35 @@
 import SwiftUI
 
-/// The App Store-style "A" used for the "Work With" picker.
+/// The App Store "A" used for the "Work With" picker.
 ///
 /// Drawn rather than taken from SF Symbols: nothing in the symbol set reads as
 /// "applications" at this size without looking like a grid of tiles.
+///
+/// The mark is not a letter A. It is three rounded strokes: two diagonals that
+/// *cross* a little below the top — leaving the two small tips that give the
+/// logo its character — and a crossbar that runs past both of them.
 struct AppsGlyph: Shape {
     func path(in rect: CGRect) -> Path {
         let width = rect.width
         let height = rect.height
+
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: width * x, y: height * y)
+        }
+
         var path = Path()
 
-        // The peak and its two legs.
-        path.move(to: CGPoint(x: width * 0.18, y: height * 0.84))
-        path.addLine(to: CGPoint(x: width * 0.51, y: height * 0.16))
-        path.addLine(to: CGPoint(x: width * 0.84, y: height * 0.84))
+        // Left tip down to the bottom-right foot.
+        path.move(to: point(0.38, 0.10))
+        path.addLine(to: point(0.82, 0.86))
 
-        // Crossbar, running past the left leg the way the real mark does.
-        path.move(to: CGPoint(x: width * 0.30, y: height * 0.60))
-        path.addLine(to: CGPoint(x: width * 0.72, y: height * 0.60))
+        // Right tip down to the bottom-left foot.
+        path.move(to: point(0.62, 0.10))
+        path.addLine(to: point(0.18, 0.86))
 
-        // Short stroke echoing the right leg on the left shoulder.
-        path.move(to: CGPoint(x: width * 0.38, y: height * 0.29))
-        path.addLine(to: CGPoint(x: width * 0.22, y: height * 0.62))
+        // Crossbar, overhanging both diagonals.
+        path.move(to: point(0.26, 0.62))
+        path.addLine(to: point(0.74, 0.62))
 
         return path
     }

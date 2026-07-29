@@ -25,17 +25,22 @@ enum Theme {
     }
 
     enum Colors {
-        /// Tint over the window material. Kept a little translucent so the
-        /// panel still reads as floating rather than as an opaque window.
+        /// Tint over the window material.
+        ///
+        /// Deliberately thin: the `NSVisualEffectView` under it is doing the
+        /// work, and anything heavier turns a floating companion into an
+        /// opaque window sitting on the desktop.
         static let surface = dynamic(
-            light: NSColor(white: 0.97, alpha: 0.80),
-            dark: NSColor(white: 0.09, alpha: 0.86)
+            light: NSColor(white: 0.97, alpha: 0.55),
+            dark: NSColor(white: 0.08, alpha: 0.42)
         )
 
-        /// The warm wash bleeding down from the top of the panel.
+        /// The warm wash bleeding down from the top of the panel. Tinted over
+        /// the material rather than painted on top of it, so the wallpaper
+        /// still reads through the header.
         static let ambient = dynamic(
-            light: NSColor(red: 0.85, green: 0.47, blue: 0.15, alpha: 0.22),
-            dark: NSColor(red: 0.78, green: 0.42, blue: 0.10, alpha: 0.62)
+            light: NSColor(red: 0.85, green: 0.47, blue: 0.15, alpha: 0.16),
+            dark: NSColor(red: 0.80, green: 0.44, blue: 0.12, alpha: 0.34)
         )
 
         /// Fill behind a user message bubble.
