@@ -268,25 +268,55 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
 
         let frame = panel.frame
-        guard abs(frame.height - targetHeight) > 0.5 else { return }
+        var target: NSRect
 
-        // origin.y is the bottom edge in AppKit coordinates, so holding it
-        // fixed is what pins the composer and grows the window upward.
-        var target = NSRect(
-            x: frame.minX,
-            y: frame.minY,
-            width: frame.width,
-            height: targetHeight
-        )
+        if expanded {
+            // origin.y is the bottom edge in AppKit coordinates, so holding it
+            // fixed is what pins the composer and grows the window upward.
+            target = NSRect(
+                x: frame.minX,
+                y: frame.minY,
+                width: frame.width,
+                height: targetHeight
+            )
 
-        // Growing upward can run off the top of the display.
-        if let visible = panel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame,
-           target.maxY > visible.maxY {
-            target.origin.y = visible.maxY - targetHeight
+            // Growing upward can run off the top of the display.
+            if let visible = panel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame,
+               target.maxY > visible.maxY {
+                target.origin.y = visible.maxY - targetHeight
+            }
+        } else {
+            // Collapsing goes back to the frame a fresh launch produces —
+            // size and position both. Holding the bottom edge instead would
+            // leave the bar wherever the tall panel happened to end, at
+            // whatever width it had been widened to.
+            target = firstOpenCollapsedFrame()
         }
+
+        guard target != frame else { return }
 
         panel.setFrame(target, display: true, animate: animated)
         panel.invalidateShadow()
+    }
+
+    /// The bar's frame on a fresh open.
+    ///
+    /// Derived rather than hard-coded: a first launch centres a *default-size*
+    /// panel and then shrinks it to the composer, holding the bottom edge. So
+    /// the bar ends up at the default panel's width and bottom edge — which is
+    /// what this reproduces, and why it can't drift from what launching does.
+    private func firstOpenCollapsedFrame() -> NSRect {
+        let size = NSSize(
+            width: CompanionPanel.defaultSize.width,
+            height: environment.collapsedContentHeight
+        )
+
+        guard let visible = (screenUnderCursor() ?? NSScreen.main)?.visibleFrame else {
+            return NSRect(origin: .zero, size: size)
+        }
+
+        let launched = launchOrigin(for: CompanionPanel.defaultSize, in: visible)
+        return NSRect(origin: NSPoint(x: launched.x, y: launched.y), size: size)
     }
 
     private var collapsedMinimumSize: NSSize {
@@ -351,13 +381,27 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
 
         let size = panel.frame.size
-        let origin = NSPoint(
-            x: visible.midX - size.width / 2,
-            // Sits a little above centre, the way a launcher-style window should.
-            y: visible.midY - size.height / 2 + visible.height * 0.08
-        )
+        let origin = launchOrigin(for: size, in: visible)
         panel.setFrame(NSRect(origin: origin, size: size), display: false)
     }
+
+    /// Where a panel of `size` is placed on a fresh open.
+    ///
+    /// Shared with ``firstOpenCollapsedFrame()`` so a new chat lands exactly
+    /// where launching does, rather than on a second copy of this arithmetic.
+    private func launchOrigin(for size: NSSize, in visible: NSRect) -> NSPoint {
+        // Anchored near the bottom rather than centred: the composer sits at
+        // the foot of the panel and is what the user types into, so it belongs
+        // low on screen — and the transcript then grows upward into the space
+        // above it. `visibleFrame` already excludes the Dock and menu bar.
+        NSPoint(
+            x: visible.midX - size.width / 2,
+            y: visible.minY + Self.launchBottomInset
+        )
+    }
+
+    /// Gap between the bottom of the screen's visible area and the panel.
+    private static let launchBottomInset: CGFloat = 40
 
     /// Moves the panel onto the display the user is currently looking at, but
     /// keeps the remembered size.
