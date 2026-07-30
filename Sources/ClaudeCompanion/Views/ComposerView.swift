@@ -10,6 +10,8 @@ struct ComposerView: View {
 
     @State private var editorHeight: CGFloat = 22
     @State private var isShowingAppPicker = false
+    /// Backing view of the `+`, used to anchor its menu.
+    @State private var attachAnchor: NSView?
 
     var body: some View {
         VStack(spacing: 8) {
@@ -22,8 +24,9 @@ struct ComposerView: View {
             container
 
             // The meter belongs to a conversation in progress; on the bare
-            // bar it is just noise under an empty field.
-            if settings.showTokenUsage, environment.isExpanded {
+            // bar it is just noise under an empty field. It follows the panel
+            // rather than the conversation so it doesn't vanish mid-sheet.
+            if settings.showTokenUsage, environment.isExpanded || environment.isShowingSettings {
                 TokenUsageView()
                     .padding(.horizontal, 4)
             }
@@ -170,30 +173,26 @@ struct ComposerView: View {
     }
 
     private var attachMenu: some View {
-        Menu {
-            Button("Upload file") { chat.presentOpenPanel(imagesOnly: false) }
-            Button("Upload photo") { chat.presentOpenPanel(imagesOnly: true) }
-
-            Menu("Take screenshot") {
-                Button("Selection…") { chat.attachScreenshot(.selection) }
-                Button("Window…") { chat.attachScreenshot(.window) }
-                Button("Entire Screen") { chat.attachScreenshot(.fullScreen) }
-            }
-
-            Button("Take photo") { chat.attachCameraPhoto() }
-        } label: {
+        ComposerIconButton(
+            help: "Add files, screenshots or photos",
+            action: presentAttachmentMenu
+        ) {
             Image(systemName: "plus")
-                .font(Theme.Fonts.controlIcon)
-                .foregroundStyle(Theme.Colors.controlIcon)
-                .frame(width: Theme.Metrics.composerControl, height: Theme.Metrics.composerControl)
-                .contentShape(Rectangle())
+                .font(Theme.Fonts.plusIcon)
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
         .disabled(chat.isCapturing)
-        .help("Add files, screenshots or photos")
         .accessibilityLabel("Add attachment")
+        .background { MenuAnchor(view: $attachAnchor) }
+    }
+
+    private func presentAttachmentMenu() {
+        guard let attachAnchor else { return }
+
+        // A menu takes key window status while it is tracking.
+        environment.panelController?.beginModalPresentation()
+        defer { environment.panelController?.endModalPresentation() }
+
+        AttachmentMenu.present(AttachmentMenu.menu(for: chat), from: attachAnchor)
     }
 
     private var appsButton: some View {
@@ -203,7 +202,7 @@ struct ComposerView: View {
             action: { isShowingAppPicker = true }
         ) {
             AppsGlyph()
-                .stroke(style: StrokeStyle(lineWidth: 1.4, lineCap: .round, lineJoin: .round))
+                .stroke(style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                 .frame(width: 17, height: 17)
         }
         .accessibilityLabel("Work with an app")

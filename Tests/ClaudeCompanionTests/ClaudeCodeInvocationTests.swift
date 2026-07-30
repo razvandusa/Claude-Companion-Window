@@ -55,6 +55,30 @@ final class ClaudeCodeInvocationTests: XCTestCase {
         XCTAssertEqual(value(after: "--effort", in: arguments), "high")
     }
 
+    /// Effort isn't universal. Sending a level a model rejects fails the whole
+    /// turn, so the argument builder has to clamp rather than pass through.
+    func testEffortStepsDownToWhatTheModelAccepts() {
+        let arguments = ClaudeCodeService.arguments(
+            for: makeRequest(model: .opus46, effort: .xhigh)
+        )
+        // xhigh arrived with Opus 4.7; 4.6 tops out at high before max.
+        XCTAssertEqual(value(after: "--effort", in: arguments), "high")
+    }
+
+    func testEffortIsOmittedForModelsThatRejectIt() {
+        let arguments = ClaudeCodeService.arguments(
+            for: makeRequest(model: .haiku, effort: .high)
+        )
+        XCTAssertFalse(arguments.contains("--effort"))
+    }
+
+    func testSupportedEffortIsPassedThroughUnchanged() {
+        let arguments = ClaudeCodeService.arguments(
+            for: makeRequest(model: .fable, effort: .max)
+        )
+        XCTAssertEqual(value(after: "--effort", in: arguments), "max")
+    }
+
     func testStreamingFlagsAreSet() {
         let arguments = ClaudeCodeService.arguments(for: makeRequest())
         XCTAssertTrue(arguments.contains("--print"))

@@ -25,6 +25,10 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var isExpanded = false
     /// Height to restore when the panel expands again.
     private var expandedHeight = CompanionPanel.defaultSize.height
+    /// A resize requested while a sheet was open, applied when it closes.
+    private var deferredExpansion: Bool?
+    /// The panel's frame before a sheet resized it, restored when it closes.
+    private var frameBeforeSheet: NSRect?
     /// When the panel was last put away, for the idle reset.
     private var hiddenAt: Date?
     private var cancellables = Set<AnyCancellable>()
@@ -107,7 +111,80 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// the whole panel.
     func beginModalPresentation() { modalDepth += 1 }
 
-    func endModalPresentation() { modalDepth = max(0, modalDepth - 1) }
+    /// Sizes the panel to exactly contain a sheet of `size`.
+    ///
+    /// Not `max(current, sheet)`: any window bigger than its sheet shows a band
+    /// of panel around it, and AppKit insets a sheet below the titlebar even on
+    /// a `fullSizeContentView` window — so the height has to be the sheet plus
+    /// that inset, and nothing more. Call before presenting, not after.
+    func makeRoomForSheet(_ size: CGSize) {
+        guard let panel else { return }
+
+        if frameBeforeSheet == nil {
+            frameBeforeSheet = panel.frame
+        }
+
+        // The part of the frame a sheet is pushed below.
+        let titlebarInset = panel.frame.height - panel.contentLayoutRect.height
+        let target = NSSize(width: size.width, height: size.height + titlebarInset)
+
+        var fitted = NSRect(
+            x: panel.frame.midX - target.width / 2,
+            y: panel.frame.minY,
+            width: target.width,
+            height: target.height
+        )
+
+        if let visible = panel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame {
+            if fitted.maxY > visible.maxY { fitted.origin.y = visible.maxY - target.height }
+            if fitted.maxX > visible.maxX { fitted.origin.x = visible.maxX - target.width }
+            if fitted.minX < visible.minX { fitted.origin.x = visible.minX }
+        }
+
+        // Room has to exist before the sheet animates in, so this one isn't
+        // deferred the way an ordinary expansion would be.
+        panel.minSize = target
+        panel.contentMinSize = target
+        panel.setFrame(fitted, display: true)
+        panel.invalidateShadow()
+    }
+
+    /// Puts the panel back where it was before a sheet resized it.
+    private func restoreFrameFromSheet() {
+        guard let panel, let saved = frameBeforeSheet else { return }
+        frameBeforeSheet = nil
+
+        panel.minSize = CompanionPanel.minimumSize
+        panel.contentMinSize = CompanionPanel.minimumSize
+        panel.setFrame(saved, display: true)
+    }
+
+    func endModalPresentation() {
+        modalDepth = max(0, modalDepth - 1)
+        guard modalDepth == 0 else { return }
+
+        // Restore the panel's own size unconditionally: a resize may have been
+        // held back while the sheet was up, and the sheet may also have grown
+        // the window past where it should sit.
+        let deferred = deferredExpansion ?? isExpanded
+        deferredExpansion = nil
+
+        Task { [weak self] in
+            // Let the sheet finish dismissing first — resizing the window out
+            // from under the tail of that animation is what makes it lurch.
+            try? await Task.sleep(nanoseconds: 220_000_000)
+            guard let self else { return }
+            guard self.modalDepth == 0 else {
+                // Something else opened in the meantime; wait for that too.
+                self.deferredExpansion = deferred
+                return
+            }
+            // Undo the sheet's sizing first — it replaced both dimensions, and
+            // `setExpanded` only ever adjusts the height.
+            self.restoreFrameFromSheet()
+            self.setExpanded(deferred, animated: true)
+        }
+    }
 
     /// Takes the panel off screen for the duration of `work`, then brings it
     /// back where it was.
@@ -161,6 +238,15 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// looking and typing, so it must not jump when a reply arrives and the
     /// transcript appears above it.
     private func setExpanded(_ expanded: Bool, animated: Bool) {
+        // A sheet is laid out against the panel it belongs to. Shrinking the
+        // window under an open Settings sheet — which is what deleting every
+        // conversation does, by emptying the transcript — leaves the sheet
+        // hanging off a window that is suddenly composer-sized.
+        guard modalDepth == 0 else {
+            deferredExpansion = expanded
+            return
+        }
+
         let wasExpanded = isExpanded
         isExpanded = expanded
 

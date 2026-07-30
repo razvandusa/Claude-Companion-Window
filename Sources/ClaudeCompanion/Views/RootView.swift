@@ -9,11 +9,21 @@ struct RootView: View {
 
     @State private var isTargetedForDrop = false
 
+    /// Whether to draw the full panel rather than the bare composer.
+    ///
+    /// Tracks the window's own size, which is why a sheet forces it on: the
+    /// window can't shrink under an open sheet, so collapsing the content
+    /// would strand a lone composer in a tall, empty, borderless window. The
+    /// panel resizes and this reverts together, once the sheet closes.
+    private var showsPanelChrome: Bool {
+        environment.isExpanded || environment.isShowingSettings
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Collapsed, the panel is only the composer: no header to dismiss
             // a conversation that doesn't exist yet, and no empty transcript.
-            if environment.isExpanded {
+            if showsPanelChrome {
                 ChatHeaderView()
 
                 TranscriptView()
@@ -26,14 +36,14 @@ struct RootView: View {
         // Collapsed there is no panel — only the composer, floating on its own.
         // Drawing the surface and its border around it would put a second box
         // around a bar that is already a box.
-        .background(alignment: .top) {
-            if environment.isExpanded {
-                AmbientBackground()
+        .background {
+            if showsPanelChrome {
+                PanelBackground()
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: Theme.Metrics.panelCornerRadius, style: .continuous))
         .overlay {
-            if environment.isExpanded {
+            if showsPanelChrome {
                 RoundedRectangle(cornerRadius: Theme.Metrics.panelCornerRadius, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
             }
@@ -66,6 +76,10 @@ struct RootView: View {
             // A sheet takes key window status; without this the panel would
             // treat that as a click-outside and dismiss itself.
             if isShowing {
+                // Order matters: the panel has to be big enough to contain the
+                // sheet before it appears, or AppKit grows the window itself
+                // and leaves it that size once the sheet closes.
+                environment.panelController?.makeRoomForSheet(SettingsView.sheetSize)
                 environment.panelController?.beginModalPresentation()
             } else {
                 environment.panelController?.endModalPresentation()
@@ -76,29 +90,16 @@ struct RootView: View {
     }
 }
 
-/// The panel's surface: window material, a tint over it, and a warm wash
-/// falling from the top edge.
+/// The panel's surface: window material with a neutral tint over it.
 ///
-/// The wash is what keeps the header from reading as a separate bar now that
-/// the divider under it is gone — the chrome and the transcript share one
-/// continuous field of colour.
-private struct AmbientBackground: View {
+/// One flat field top to bottom, with no divider under the header, so the
+/// chrome and the transcript read as a single surface.
+private struct PanelBackground: View {
     var body: some View {
-        ZStack(alignment: .top) {
+        ZStack {
             VisualEffectView(material: .hudWindow)
 
             Theme.Colors.surface
-
-            LinearGradient(
-                stops: [
-                    .init(color: Theme.Colors.ambient, location: 0),
-                    .init(color: Theme.Colors.ambient.opacity(0.55), location: 0.35),
-                    .init(color: Theme.Colors.ambient.opacity(0), location: 1)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: Theme.Metrics.ambientHeight)
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)

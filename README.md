@@ -19,7 +19,7 @@ opened with the global shortcut or from the status item menu.
 
 ```sh
 swift build     # compile only
-swift test      # 84 unit tests
+swift test      # 96 unit tests
 ```
 
 Requires macOS 14+, Xcode 16 (Swift 6 toolchain, Swift 5 language mode), and
@@ -103,13 +103,25 @@ through `AppEnvironment`.
 
 ## Models and reasoning
 
-Claude Opus (`claude-opus-5`), Sonnet (`claude-sonnet-5`) and Haiku
-(`claude-haiku-4-5`), switchable from the header or Settings.
+The same list Claude itself offers, switchable from the header menu or
+Settings: Fable 5 (`claude-fable-5`), Opus 5 (`claude-opus-5`), Sonnet 5
+(`claude-sonnet-5`) and Haiku 4.5 (`claude-haiku-4-5`), with Opus 4.8, 4.7,
+4.6 and Sonnet 4.6 under "More models".
+
+**Fable 5 bills against usage credits, not the subscription.** It carries a
+badge in both pickers and a warning in Settings, because everything else in
+this app is built to keep usage on the Pro/Max plan.
 
 Reasoning appears in a collapsed disclosure above each reply. "Show thinking"
-controls that disclosure; how much Claude actually reasons is set by Effort
-(`--effort`, default `medium` — a better fit for a chat window than the CLI
-default of `high`).
+controls that disclosure; how much Claude actually reasons is set by Effort —
+`low`, `medium`, `high`, `xhigh` (shown as "Extra", matching Claude) and `max`.
+The default stays `medium`, a better fit for a chat window than Claude's own
+default of `high`.
+
+Effort is not uniform across models, and sending a level a model rejects fails
+the whole turn: `xhigh` arrived with Opus 4.7, and Haiku 4.5 refuses the flag
+outright. The argument builder steps down to the nearest level the chosen model
+accepts, or omits `--effort` entirely.
 
 The window is a chat surface, not a coding agent: every turn runs with
 `--strict-mcp-config` and `--disable-slash-commands`, under its own system

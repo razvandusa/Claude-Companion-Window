@@ -62,6 +62,40 @@ final class CompanionSurfacesTests: XCTestCase {
         XCTAssertNil(makeApp("Notes", isRunning: true, pid: 1).runningStateLabel)
     }
 
+    // MARK: - Models
+
+    /// The five levels the CLI's `--effort` actually accepts, in order.
+    func testEffortLadderMatchesTheCLI() {
+        XCTAssertEqual(
+            ReasoningEffort.allCases.map(\.rawValue),
+            ["low", "medium", "high", "xhigh", "max"]
+        )
+        // Claude labels xhigh "Extra"; the raw value is what crosses the pipe.
+        XCTAssertEqual(ReasoningEffort.xhigh.displayName, "Extra")
+    }
+
+    func testOnlyFableIsFlaggedAsBillingToUsageCredits() {
+        let flagged = ClaudeModel.allCases.filter(\.requiresUsageCredits)
+        XCTAssertEqual(flagged, [.fable])
+        XCTAssertTrue(ClaudeModel.fable.pickerLabel.contains("usage credits"))
+    }
+
+    /// A stale transcript naming a retired model must not block launch.
+    func testUnknownModelIDsDecodeToTheDefault() throws {
+        let decoded = try JSONDecoder().decode(
+            ClaudeModel.self,
+            from: Data("\"claude-3-opus-20240229\"".utf8)
+        )
+        XCTAssertEqual(decoded, ClaudeModel.defaultModel)
+    }
+
+    func testHaikuHasASmallerContextWindowAndOutputCap() {
+        XCTAssertEqual(ClaudeModel.haiku.contextWindow, 200_000)
+        XCTAssertEqual(ClaudeModel.haiku.maximumOutputTokens, 64_000)
+        XCTAssertEqual(ClaudeModel.opus.contextWindow, 1_000_000)
+        XCTAssertEqual(ClaudeModel.opus.maximumOutputTokens, 128_000)
+    }
+
     // MARK: - Read aloud
 
     /// A spoken answer shouldn't be a recital of punctuation.

@@ -14,6 +14,11 @@ struct SettingsView: View {
     @State private var statusIsError = false
     @State private var isConfirmingClear = false
 
+    /// Fixed size of the sheet. Published so the panel can make room for it
+    /// before it appears — AppKit grows a window that can't contain its sheet,
+    /// and leaves it grown afterwards.
+    static let sheetSize = CGSize(width: 460, height: 560)
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -32,7 +37,7 @@ struct SettingsView: View {
                 .padding(18)
             }
         }
-        .frame(width: 460, height: 560)
+        .frame(width: Self.sheetSize.width, height: Self.sheetSize.height)
         .background(VisualEffectView(material: .windowBackground))
         .onAppear {
             executablePathField = UserDefaults.standard
@@ -107,12 +112,21 @@ struct SettingsView: View {
 
     private var modelSection: some View {
         SettingsSection("Model") {
+            // A menu rather than a segmented control: eight models don't fit
+            // across the sheet, and the sections keep the current generation
+            // separate from the older ones.
             Picker("Model", selection: $settings.model) {
-                ForEach(ClaudeModel.allCases) { model in
-                    Text(model.displayName).tag(model)
+                Section {
+                    ForEach(ClaudeModel.current) { model in
+                        Text(model.pickerLabel).tag(model)
+                    }
+                }
+                Section("Previous generations") {
+                    ForEach(ClaudeModel.previousGenerations) { model in
+                        Text(model.pickerLabel).tag(model)
+                    }
                 }
             }
-            .pickerStyle(.segmented)
             .labelsHidden()
 
             Text(settings.model.summary)
@@ -120,19 +134,35 @@ struct SettingsView: View {
                 .foregroundStyle(Theme.Colors.subtleText)
                 .fixedSize(horizontal: false, vertical: true)
 
+            if settings.model.requiresUsageCredits {
+                Label(
+                    "This model bills against usage credits, not your subscription.",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(Theme.Fonts.caption)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
             Toggle("Show thinking", isOn: $settings.isThinkingEnabled)
                 .help("Shows a summary of Claude's reasoning above each reply. Use Effort to control how much it reasons.")
 
-            Picker("Effort", selection: $settings.effort) {
-                ForEach(ReasoningEffort.allCases) { effort in
-                    Text(effort.displayName).tag(effort)
+            if settings.model.supportedEfforts.isEmpty {
+                Text("Effort: not supported by \(settings.model.displayName).")
+                    .font(Theme.Fonts.caption)
+                    .foregroundStyle(Theme.Colors.subtleText)
+            } else {
+                Picker("Effort", selection: $settings.effort) {
+                    ForEach(settings.model.supportedEfforts) { effort in
+                        Text(effort.displayName).tag(effort)
+                    }
                 }
-            }
-            .pickerStyle(.segmented)
+                .pickerStyle(.segmented)
 
-            Text(settings.effort.summary)
-                .font(Theme.Fonts.caption)
-                .foregroundStyle(Theme.Colors.subtleText)
+                Text(settings.effort.summary)
+                    .font(Theme.Fonts.caption)
+                    .foregroundStyle(Theme.Colors.subtleText)
+            }
 
             HStack {
                 Text("Max response length")
@@ -271,12 +301,13 @@ struct SettingsView: View {
 
     private func clearConversations() {
         Task {
-            try? await environment.conversationStore.deleteAll()
-            await MainActor.run {
-                chat.startNewConversation()
-                statusMessage = "All conversations deleted."
-                statusIsError = false
-            }
+            await chat.deleteAllConversations()
+
+            // Deleting everything resets the app to its empty state, so it
+            // closes Settings with it. Staying here would hold the panel at
+            // full height over a conversation that no longer exists, waiting
+            // on a Done press to show a result that has already happened.
+            environment.isShowingSettings = false
         }
     }
 }

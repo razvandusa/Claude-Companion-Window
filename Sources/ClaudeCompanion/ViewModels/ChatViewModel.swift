@@ -156,10 +156,42 @@ final class ChatViewModel: ObservableObject {
 
     func deleteConversation(id: UUID) {
         recentConversations.removeAll { $0.id == id }
-        Task { try? await store.delete(id: id) }
+
         if conversation.id == id {
+            // Drop any queued save with it. `persist` reads whatever is open
+            // when it finally runs, so this isn't load-bearing today — it
+            // stops a snapshotting save from resurrecting the file later.
+            saveTask?.cancel()
+            saveTask = nil
             conversation = Conversation(model: settings.model)
         }
+
+        Task { try? await store.delete(id: id) }
+    }
+
+    /// Deletes every stored transcript and starts over.
+    ///
+    /// The bug this replaced was `startNewConversation()` after a wipe, which
+    /// left `recentConversations` untouched: the files were gone but the
+    /// Recent menu still listed them, and picking one reopened a deleted
+    /// conversation that the next turn wrote back to disk.
+    ///
+    /// The open conversation is dropped without being persisted, and anything
+    /// staged for the next message goes with it — a delete-all that leaves the
+    /// composer loaded hasn't really cleared anything.
+    func deleteAllConversations() async {
+        cancelStreaming()
+        saveTask?.cancel()
+        saveTask = nil
+
+        recentConversations = []
+        conversation = Conversation(model: settings.model)
+        draft = ""
+        pendingAttachments = []
+        workingWithApps = []
+        transientMessage = nil
+
+        try? await store.deleteAll()
     }
 
     // MARK: - Attachments

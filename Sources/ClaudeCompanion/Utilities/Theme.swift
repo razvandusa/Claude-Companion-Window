@@ -20,8 +20,6 @@ enum Theme {
         /// Square hit target for the icon buttons on the composer's control row.
         static let composerControl: CGFloat = 30
         static let sendButton: CGFloat = 34
-        /// How far down the panel the warm ambient wash reaches.
-        static let ambientHeight: CGFloat = 300
     }
 
     enum Colors {
@@ -33,14 +31,6 @@ enum Theme {
         static let surface = dynamic(
             light: NSColor(white: 0.97, alpha: 0.55),
             dark: NSColor(white: 0.08, alpha: 0.42)
-        )
-
-        /// The warm wash bleeding down from the top of the panel. Tinted over
-        /// the material rather than painted on top of it, so the wallpaper
-        /// still reads through the header.
-        static let ambient = dynamic(
-            light: NSColor(red: 0.85, green: 0.47, blue: 0.15, alpha: 0.16),
-            dark: NSColor(red: 0.80, green: 0.44, blue: 0.12, alpha: 0.34)
         )
 
         /// Fill behind a user message bubble.
@@ -135,7 +125,18 @@ enum Theme {
         static let code = Font.system(.callout, design: .monospaced)
         static let caption = Font.caption
         static let title = Font.system(.body, design: .default).weight(.semibold)
-        /// Icons on the composer control row and the assistant action row.
-        static let controlIcon = Font.system(size: 16, weight: .regular)
+        /// Icons on the composer control row.
+        ///
+        /// Medium, not light: these are solid line glyphs that have to hold
+        /// their own against the filled send button at the other end of the
+        /// row, and thin strokes wash out against the composer fill.
+        static let controlIcon = Font.system(size: 19, weight: .medium)
+
+        /// The `+`, at a larger point size than the icons beside it.
+        ///
+        /// SF Symbols draws `plus` small inside its em box, so matching the
+        /// others' point size leaves it visibly the runt of the row; matching
+        /// their *drawn* size is what's wanted.
+        static let plusIcon = Font.system(size: 21, weight: .regular)
     }
 }

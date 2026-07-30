@@ -226,7 +226,6 @@ struct ClaudeCodeService: ClaudeServicing {
             "--include-partial-messages",
             "--verbose",
             "--model", request.model.rawValue,
-            "--effort", request.effort.rawValue,
             // This is a chat window, not a coding agent: no MCP servers, no
             // skills, and our own system prompt in place of the agent one. The
             // tool list stays empty unless the user lit the globe, and even
@@ -239,6 +238,13 @@ struct ClaudeCodeService: ClaudeServicing {
                 isWebSearchEnabled: request.isWebSearchEnabled
             )
         ]
+
+        // Effort isn't universal: `xhigh` arrived with Opus 4.7, and Haiku 4.5
+        // rejects the flag outright. Send the nearest level the chosen model
+        // accepts, or omit it entirely.
+        if let effort = request.model.resolvedEffort(request.effort) {
+            arguments += ["--effort", effort.rawValue]
+        }
 
         let session = request.sessionID.uuidString.lowercased()
         arguments += request.isResuming ? ["--resume", session] : ["--session-id", session]

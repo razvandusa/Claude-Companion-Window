@@ -37,13 +37,34 @@ struct ChatHeaderView: View {
         Menu {
             Section("Model") {
                 Picker("Model", selection: $settings.model) {
-                    ForEach(ClaudeModel.allCases) { model in
-                        Text(model.displayName).tag(model)
+                    ForEach(ClaudeModel.current) { model in
+                        Text(model.pickerLabel).tag(model)
                     }
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()
             }
+
+            Menu("More models") {
+                Picker("Model", selection: $settings.model) {
+                    ForEach(ClaudeModel.previousGenerations) { model in
+                        Text(model.pickerLabel).tag(model)
+                    }
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            }
+
+            Menu("Effort") {
+                Picker("Effort", selection: $settings.effort) {
+                    ForEach(settings.model.supportedEfforts) { effort in
+                        Text(effort.displayName).tag(effort)
+                    }
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            }
+            .disabled(settings.model.supportedEfforts.isEmpty)
 
             if !chat.recentConversations.isEmpty {
                 Section("Recent") {

@@ -9,29 +9,79 @@ import SwiftUI
 /// *cross* a little below the top — leaving the two small tips that give the
 /// logo its character — and a crossbar that runs past both of them.
 struct AppsGlyph: Shape {
-    func path(in rect: CGRect) -> Path {
-        let width = rect.width
-        let height = rect.height
+    /// Lean of each diagonal away from vertical. This alone sets how squat the
+    /// mark is, and with it how far the equal-length crossbar overhangs the
+    /// feet: level with them at ~35°, a clear 1pt past them at 30°.
+    private let lean = Angle(degrees: 30)
+    /// Fraction of a diagonal's horizontal run that sits above the crossing,
+    /// i.e. how far the two tips poke out of the top.
+    private let tipFraction: CGFloat = 0.13
+    /// How far down the diagonals' vertical extent the crossbar sits.
+    ///
+    /// Low enough that the splay it cuts off at the bottom answers the apex at
+    /// the top; nearer the middle the mark goes top-heavy and starts reading
+    /// as a letter A again.
+    private let crossbarFraction: CGFloat = 0.81
+    /// Stroke length as a fraction of the frame, leaving room for round caps.
+    ///
+    /// Everything is laid out around the frame's centre, so this draws all
+    /// three strokes in or out together without disturbing their equality.
+    private let scale: CGFloat = 0.80
 
-        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: width * x, y: height * y)
-        }
+    func path(in rect: CGRect) -> Path {
+        // One length, used for all three strokes. Because a diagonal's run and
+        // drop are that length's sine and cosine, each diagonal comes out
+        // exactly as long as the crossbar by construction rather than by
+        // hand-tuned endpoints.
+        let length = min(rect.width, rect.height) * scale
+        let run = length * sin(lean.radians)
+        let drop = length * cos(lean.radians)
+
+        let midX = rect.midX
+        let top = rect.midY - drop / 2
+        let bottom = rect.midY + drop / 2
+        let halfTip = run * tipFraction
 
         var path = Path()
 
-        // Left tip down to the bottom-right foot.
-        path.move(to: point(0.38, 0.10))
-        path.addLine(to: point(0.82, 0.86))
+        // Upper-left tip down to the lower-right foot, and its mirror.
+        path.move(to: CGPoint(x: midX - halfTip, y: top))
+        path.addLine(to: CGPoint(x: midX - halfTip + run, y: bottom))
 
-        // Right tip down to the bottom-left foot.
-        path.move(to: point(0.62, 0.10))
-        path.addLine(to: point(0.18, 0.86))
+        path.move(to: CGPoint(x: midX + halfTip, y: top))
+        path.addLine(to: CGPoint(x: midX + halfTip - run, y: bottom))
 
-        // Crossbar, overhanging both diagonals.
-        path.move(to: point(0.26, 0.62))
-        path.addLine(to: point(0.74, 0.62))
+        // Crossbar.
+        let crossbarY = top + drop * crossbarFraction
+        path.move(to: CGPoint(x: midX - length / 2, y: crossbarY))
+        path.addLine(to: CGPoint(x: midX + length / 2, y: crossbarY))
 
         return path
+    }
+}
+
+/// The hit target, highlight and hover wash shared by every control on the
+/// composer's row — including the `+`, which is a `Menu` rather than a button
+/// and so can't get them from ``ComposerIconButton``.
+struct ComposerIconChrome<Content: View>: View {
+    var isActive: Bool = false
+    var isHovering: Bool = false
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .frame(width: Theme.Metrics.composerControl, height: Theme.Metrics.composerControl)
+            .background {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Theme.Colors.controlActive)
+                    .opacity(isActive ? 1 : 0)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Theme.Colors.hoverHighlight)
+                            .opacity(isHovering ? 1 : 0)
+                    }
+            }
+            .contentShape(Rectangle())
     }
 }
 
@@ -60,22 +110,10 @@ struct ComposerIconButton<Icon: View>: View {
         .help(help)
     }
 
-    /// Split out so a `Menu` can borrow the same look for its label.
-    var label: some View {
-        icon()
-            .foregroundStyle(foreground)
-            .frame(width: Theme.Metrics.composerControl, height: Theme.Metrics.composerControl)
-            .background {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Theme.Colors.controlActive)
-                    .opacity(isActive ? 1 : 0)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Theme.Colors.hoverHighlight)
-                            .opacity(isHovering && isEnabled ? 1 : 0)
-                    }
-            }
-            .contentShape(Rectangle())
+    private var label: some View {
+        ComposerIconChrome(isActive: isActive, isHovering: isHovering && isEnabled) {
+            icon().foregroundStyle(foreground)
+        }
     }
 
     private var foreground: Color {
@@ -120,7 +158,7 @@ struct SendButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: isStreaming ? "stop.fill" : "arrow.up")
-                .font(.system(size: isStreaming ? 11 : 14, weight: .bold))
+                .font(.system(size: isStreaming ? 11 : 15, weight: .semibold))
                 .foregroundStyle(isActive ? Theme.Colors.sendGlyph : Theme.Colors.sendGlyphDisabled)
                 .frame(width: Theme.Metrics.sendButton, height: Theme.Metrics.sendButton)
                 .background {
