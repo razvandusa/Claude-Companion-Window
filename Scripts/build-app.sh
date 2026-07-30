@@ -57,10 +57,20 @@ printf 'APPL????' > "${APP}/Contents/PkgInfo"
 #   2. export CODESIGN_IDENTITY="Claude Companion"
 #
 # A Developer ID identity works the same way and is what you'd use to ship.
-IDENTITY="${CODESIGN_IDENTITY:--}"
+# Prefer an explicit identity, then a stable one created by
+# Scripts/create-signing-identity.sh, and only then fall back to ad-hoc.
+IDENTITY="${CODESIGN_IDENTITY:-}"
+if [ -z "$IDENTITY" ]; then
+    if security find-identity -v -p codesigning 2>/dev/null | grep -q "$APP_NAME"; then
+        IDENTITY="$APP_NAME"
+    else
+        IDENTITY="-"
+    fi
+fi
 
 if [ "$IDENTITY" = "-" ]; then
-    echo "==> Signing (ad-hoc — permissions will be re-requested after each build)"
+    echo "==> Signing (ad-hoc — permissions are lost on every rebuild)"
+    echo "    Fix once with: ./Scripts/create-signing-identity.sh"
 else
     echo "==> Signing as ${IDENTITY}"
 fi
