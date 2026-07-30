@@ -24,9 +24,8 @@ struct ComposerView: View {
             container
 
             // The meter belongs to a conversation in progress; on the bare
-            // bar it is just noise under an empty field. It follows the panel
-            // rather than the conversation so it doesn't vanish mid-sheet.
-            if settings.showTokenUsage, environment.isExpanded || environment.isShowingSettings {
+            // bar it is just noise under an empty field.
+            if settings.showTokenUsage, environment.isExpanded, !environment.isShowingSettings {
                 TokenUsageView()
                     .padding(.horizontal, 4)
             }

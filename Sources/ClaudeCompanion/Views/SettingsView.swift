@@ -7,17 +7,14 @@ struct SettingsView: View {
     @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var chat: ChatViewModel
 
-    @Environment(\.dismiss) private var dismiss
-
     @State private var executablePathField = ""
     @State private var statusMessage: String?
     @State private var statusIsError = false
     @State private var isConfirmingClear = false
 
-    /// Fixed size of the sheet. Published so the panel can make room for it
-    /// before it appears — AppKit grows a window that can't contain its sheet,
-    /// and leaves it grown afterwards.
-    static let sheetSize = CGSize(width: 460, height: 560)
+    /// Size the panel takes while Settings is open. Settings fills the panel
+    /// rather than floating in it as a sheet, so this is the window size.
+    static let preferredSize = CGSize(width: 460, height: 560)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -37,7 +34,7 @@ struct SettingsView: View {
                 .padding(18)
             }
         }
-        .frame(width: Self.sheetSize.width, height: Self.sheetSize.height)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(VisualEffectView(material: .windowBackground))
         .onAppear {
             executablePathField = UserDefaults.standard
@@ -51,7 +48,7 @@ struct SettingsView: View {
             Text("Settings")
                 .font(.system(size: 14, weight: .semibold))
             Spacer()
-            Button("Done") { dismiss() }
+            Button("Done") { environment.isShowingSettings = false }
                 .keyboardShortcut(.defaultAction)
         }
         .padding(.horizontal, 16)

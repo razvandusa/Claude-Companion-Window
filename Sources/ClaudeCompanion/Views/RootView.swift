@@ -11,15 +11,59 @@ struct RootView: View {
 
     /// Whether to draw the full panel rather than the bare composer.
     ///
-    /// Tracks the window's own size, which is why a sheet forces it on: the
-    /// window can't shrink under an open sheet, so collapsing the content
-    /// would strand a lone composer in a tall, empty, borderless window. The
-    /// panel resizes and this reverts together, once the sheet closes.
+    /// Off entirely while a sheet is up: the panel is resized to exactly
+    /// contain the sheet, so the only part of the window left uncovered is the
+    /// strip a sheet is inset below. Drawing the surface there would put a band
+    /// of panel above the sheet with nothing in it.
     private var showsPanelChrome: Bool {
-        environment.isExpanded || environment.isShowingSettings
+        environment.isExpanded && !environment.isShowingSettings
     }
 
     var body: some View {
+        Group {
+            if environment.isShowingSettings {
+                // Settings fills the panel rather than arriving as a sheet.
+                // A sheet is always inset below the titlebar and is grown to
+                // fit by AppKit, which leaves strips of window showing above
+                // and below it however precisely the window is sized. Filling
+                // the panel means there is nothing left over to show.
+                SettingsView()
+                    .environmentObject(environment)
+                    .environmentObject(environment.settings)
+                    .environmentObject(chat)
+                    .transition(.opacity)
+            } else {
+                conversation
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Metrics.panelCornerRadius, style: .continuous))
+        .overlay {
+            if showsPanelChrome || environment.isShowingSettings {
+                RoundedRectangle(cornerRadius: Theme.Metrics.panelCornerRadius, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+            }
+        }
+        .animation(Theme.Animations.quick, value: environment.isShowingSettings)
+        // On the outer view, not on the conversation: the conversation is
+        // removed while Settings is up, so an observer attached there would
+        // never see it close.
+        .onChange(of: environment.isShowingSettings) { _, isShowing in
+            if isShowing {
+                // The window resizes to Settings' size and back again. It is
+                // held in a modal state throughout so a focus change doesn't
+                // read as a click outside and dismiss the panel.
+                environment.panelController?.makeRoomForSheet(SettingsView.preferredSize)
+                environment.panelController?.beginModalPresentation()
+            } else {
+                environment.panelController?.endModalPresentation()
+                Task { await chat.refreshStatus() }
+            }
+        }
+        .preferredColorScheme(nil)
+    }
+
+    /// The panel's normal contents.
+    private var conversation: some View {
         VStack(spacing: 0) {
             // Collapsed, the panel is only the composer: no header to dismiss
             // a conversation that doesn't exist yet, and no empty transcript.
@@ -41,13 +85,6 @@ struct RootView: View {
                 PanelBackground()
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Metrics.panelCornerRadius, style: .continuous))
-        .overlay {
-            if showsPanelChrome {
-                RoundedRectangle(cornerRadius: Theme.Metrics.panelCornerRadius, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
-            }
-        }
         .overlay {
             if isTargetedForDrop {
                 DropTargetOverlay()
@@ -66,27 +103,6 @@ struct RootView: View {
             }
             return true
         }
-        .sheet(isPresented: $environment.isShowingSettings) {
-            SettingsView()
-                .environmentObject(environment)
-                .environmentObject(environment.settings)
-                .environmentObject(chat)
-        }
-        .onChange(of: environment.isShowingSettings) { _, isShowing in
-            // A sheet takes key window status; without this the panel would
-            // treat that as a click-outside and dismiss itself.
-            if isShowing {
-                // Order matters: the panel has to be big enough to contain the
-                // sheet before it appears, or AppKit grows the window itself
-                // and leaves it that size once the sheet closes.
-                environment.panelController?.makeRoomForSheet(SettingsView.sheetSize)
-                environment.panelController?.beginModalPresentation()
-            } else {
-                environment.panelController?.endModalPresentation()
-                Task { await chat.refreshStatus() }
-            }
-        }
-        .preferredColorScheme(nil)
     }
 }
 

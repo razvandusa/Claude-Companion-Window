@@ -111,12 +111,11 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// the whole panel.
     func beginModalPresentation() { modalDepth += 1 }
 
-    /// Sizes the panel to exactly contain a sheet of `size`.
+    /// Sizes the panel to exactly `size`, remembering where it was.
     ///
-    /// Not `max(current, sheet)`: any window bigger than its sheet shows a band
-    /// of panel around it, and AppKit insets a sheet below the titlebar even on
-    /// a `fullSizeContentView` window — so the height has to be the sheet plus
-    /// that inset, and nothing more. Call before presenting, not after.
+    /// Used when Settings takes over the panel. Exactly, not `max(current,
+    /// size)`: a window larger than the view filling it shows a band of empty
+    /// panel around that view.
     func makeRoomForSheet(_ size: CGSize) {
         guard let panel else { return }
 
@@ -124,9 +123,7 @@ final class PanelController: NSObject, NSWindowDelegate {
             frameBeforeSheet = panel.frame
         }
 
-        // The part of the frame a sheet is pushed below.
-        let titlebarInset = panel.frame.height - panel.contentLayoutRect.height
-        let target = NSSize(width: size.width, height: size.height + titlebarInset)
+        let target = NSSize(width: size.width, height: size.height)
 
         var fitted = NSRect(
             x: panel.frame.midX - target.width / 2,
