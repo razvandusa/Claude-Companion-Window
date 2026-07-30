@@ -341,6 +341,15 @@ final class PanelController: NSObject, NSWindowDelegate {
 
         let hosting = NSHostingView(rootView: root)
         hosting.wantsLayer = true
+        // A `.titled` window reserves a 28pt titlebar, and SwiftUI honours it
+        // as a safe area even though `.fullSizeContentView` puts the content
+        // underneath. That left a transparent strip above the visible panel:
+        // it swallowed clicks and pushed the resize edge above the border.
+        //
+        // Cleared here rather than with `ignoresSafeArea()` on the view, which
+        // extends the content *into* the strip and shifts the header off the
+        // top instead of removing the inset.
+        hosting.safeAreaRegions = []
         panel.contentView = hosting
 
         restoreFrame(into: panel)
