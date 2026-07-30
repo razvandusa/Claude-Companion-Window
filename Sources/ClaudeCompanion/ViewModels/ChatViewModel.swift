@@ -294,6 +294,13 @@ final class ChatViewModel: ObservableObject {
     func addWorkingWithApp(_ app: CompanionApp) {
         guard !workingWithApps.contains(where: { $0.id == app.id }) else { return }
         workingWithApps.append(app)
+
+        // Say so now rather than at send time: without this permission the
+        // capture silently produces nothing, and the first sign of trouble is
+        // Claude answering that it can't see your screen.
+        if !ScreenCaptureService.hasPermission {
+            transientMessage = "Screen Recording is off, so \(app.name) can't be captured. Turn it on in System Settings › Privacy & Security."
+        }
     }
 
     func removeWorkingWithApp(id: String) {
@@ -332,14 +339,36 @@ final class ChatViewModel: ObservableObject {
         isCapturing = true
         Task {
             var all = attachments
+            var captured = 0
+            var failure: String?
+
             for app in apps {
                 switch await ScreenCaptureService.captureWindow(of: app) {
-                case .captured(let attachment): all.append(attachment)
-                case .cancelled: break
-                case .failure(let reason): transientMessage = reason
+                case .captured(let attachment):
+                    all.append(attachment)
+                    captured += 1
+                case .cancelled:
+                    break
+                case .failure(let reason):
+                    failure = reason
                 }
             }
+
             isCapturing = false
+
+            if let failure {
+                transientMessage = failure
+            }
+
+            // Sending a question about an app without the picture of it gets a
+            // truthful "I can't see your screen" — which reads as the app
+            // being broken. Hand the question back instead, with the reason.
+            guard captured > 0 || !attachments.isEmpty else {
+                draft = text
+                pendingAttachments = attachments
+                return
+            }
+
             dispatch(text: text, attachments: all)
         }
     }

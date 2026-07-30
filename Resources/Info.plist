@@ -5,15 +5,17 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Claude Companion</string>
+	<string>Claude Pet</string>
 	<key>CFBundleExecutable</key>
 	<string>ClaudeCompanion</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.claudecompanion.app</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Claude Companion</string>
+	<string>Claude Pet</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -28,14 +30,14 @@
 	<true/>
 	<!-- "Take photo" in the composer's + menu. -->
 	<key>NSCameraUsageDescription</key>
-	<string>Claude Companion uses the camera when you choose "Take photo", so the picture can be attached to your message.</string>
+	<string>Claude Pet uses the camera when you choose "Take photo", so the picture can be attached to your message.</string>
 	<!-- The mic button dictates into the composer. -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Claude Companion uses the microphone to dictate your message.</string>
+	<string>Claude Pet uses the microphone to dictate your message.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Claude Companion transcribes what you dictate into the composer.</string>
+	<string>Claude Pet transcribes what you dictate into the composer.</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Claude Companion</string>
+	<string>Claude Pet</string>
 	<key>NSSupportsAutomaticTermination</key>
 	<false/>
 	<key>NSSupportsSuddenTermination</key>

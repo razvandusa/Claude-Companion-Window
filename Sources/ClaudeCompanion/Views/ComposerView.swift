@@ -15,12 +15,6 @@ struct ComposerView: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            if let message = chat.transientMessage {
-                TransientBanner(message: message) {
-                    chat.transientMessage = nil
-                }
-            }
-
             container
 
             // The meter belongs to a conversation in progress; on the bare
@@ -32,9 +26,14 @@ struct ComposerView: View {
         }
         .padding(.horizontal, Theme.Metrics.horizontalPadding)
         .padding(.bottom, 14)
+        // Take the height the content actually needs, never the height the
+        // window happens to offer. Without this a banner taller than the bar
+        // was squeezed, and the squeezed height was what got measured — so the
+        // window never learned it had to grow, and the text stayed clipped.
+        .fixedSize(horizontal: false, vertical: true)
         .background {
-            // Reports the collapsed bar's natural height so the panel can size
-            // itself to the composer, including when a draft grows it.
+            // Reports that height so the panel can size itself to the bar,
+            // including when a draft wraps or a notice appears above it.
             GeometryReader { proxy in
                 Color.clear.preference(
                     key: ComposerHeightKey.self,
@@ -53,6 +52,16 @@ struct ComposerView: View {
 
     private var container: some View {
         VStack(alignment: .leading, spacing: 10) {
+            // Inside the box, not floating above it: as a separate element the
+            // notice sat outside the rounded bar and could overflow the window,
+            // which clipped its first line away.
+            if let message = chat.transientMessage {
+                TransientBanner(message: message) {
+                    chat.transientMessage = nil
+                }
+                .transition(.opacity)
+            }
+
             if !chat.workingWithApps.isEmpty {
                 WorkingWithStrip(apps: chat.workingWithApps) { id in
                     chat.removeWorkingWithApp(id: id)
@@ -281,8 +290,8 @@ private struct TransientBanner: View {
         .padding(.vertical, 7)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            Theme.Colors.composerFill,
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            Theme.Colors.controlActive,
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
         )
         .transition(.opacity)
     }

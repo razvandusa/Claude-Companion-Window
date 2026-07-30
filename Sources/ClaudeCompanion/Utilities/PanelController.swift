@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import Combine
+import OSLog
 
 /// Owns the lifecycle of the floating panel: showing, hiding, remembering where
 /// it was, and the keyboard handling that only applies while it is on screen.
@@ -132,10 +133,8 @@ final class PanelController: NSObject, NSWindowDelegate {
             height: target.height
         )
 
-        if let visible = panel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame {
-            if fitted.maxY > visible.maxY { fitted.origin.y = visible.maxY - target.height }
-            if fitted.maxX > visible.maxX { fitted.origin.x = visible.maxX - target.width }
-            if fitted.minX < visible.minX { fitted.origin.x = visible.minX }
+        if let visible = activeVisibleFrame {
+            fitted = clamped(fitted, to: visible)
         }
 
         // Room has to exist before the sheet animates in, so this one isn't
@@ -280,17 +279,18 @@ final class PanelController: NSObject, NSWindowDelegate {
                 height: targetHeight
             )
 
-            // Growing upward can run off the top of the display.
-            if let visible = panel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame,
-               target.maxY > visible.maxY {
-                target.origin.y = visible.maxY - targetHeight
-            }
         } else {
             // Collapsing goes back to the frame a fresh launch produces —
             // size and position both. Holding the bottom edge instead would
             // leave the bar wherever the tall panel happened to end, at
             // whatever width it had been widened to.
             target = firstOpenCollapsedFrame()
+        }
+
+        // Growing upward can run off the top of the display, and a remembered
+        // height can be taller than the screen it is opening on.
+        if let visible = activeVisibleFrame {
+            target = clamped(target, to: visible)
         }
 
         guard target != frame else { return }
@@ -350,6 +350,11 @@ final class PanelController: NSObject, NSWindowDelegate {
         // extends the content *into* the strip and shifts the header off the
         // top instead of removing the inset.
         hosting.safeAreaRegions = []
+        // And it must not size the window either. By default an NSHostingView
+        // imposes its content's fitting height on the window it fills, keeping
+        // the top edge and growing downward — so a long transcript dragged the
+        // panel to the full height of the display and left it there.
+        hosting.sizingOptions = []
         panel.contentView = hosting
 
         restoreFrame(into: panel)
@@ -374,7 +379,10 @@ final class PanelController: NSObject, NSWindowDelegate {
             return
         }
 
-        panel.setFrame(saved, display: false)
+        // A frame saved on another display — or from before a clamp existed —
+        // can be larger than this screen; bring it back inside.
+        let visible = (panel.screen ?? NSScreen.main)?.visibleFrame
+        panel.setFrame(visible.map { clamped(saved, to: $0) } ?? saved, display: false)
     }
 
     /// Guards against restoring onto a display that has since been unplugged.
@@ -392,6 +400,26 @@ final class PanelController: NSObject, NSWindowDelegate {
         let size = panel.frame.size
         let origin = launchOrigin(for: size, in: visible)
         panel.setFrame(NSRect(origin: origin, size: size), display: false)
+    }
+
+    /// Keeps a frame within the screen it sits on.
+    ///
+    /// Nothing else bounded the panel's height, so a height that grew once —
+    /// by dragging the resize handle, or restored from a stale saved frame —
+    /// was carried forward for good, and the window opened taller than the
+    /// display every time.
+    private func clamped(_ frame: NSRect, to visible: NSRect) -> NSRect {
+        var result = frame
+        result.size.height = min(result.height, visible.height)
+        result.size.width = min(result.width, visible.width)
+        result.origin.y = min(max(result.minY, visible.minY), visible.maxY - result.height)
+        result.origin.x = min(max(result.minX, visible.minX), visible.maxX - result.width)
+        return result
+    }
+
+    /// The visible area of the screen the panel is on, or the main one.
+    private var activeVisibleFrame: NSRect? {
+        panel?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
     }
 
     /// Where a panel of `size` is placed on a fresh open.

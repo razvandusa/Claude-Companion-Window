@@ -28,6 +28,7 @@ struct SettingsView: View {
                     modelSection
                     shortcutSection
                     behaviorSection
+                    permissionsSection
                     dataSection
                     aboutSection
                 }
@@ -219,6 +220,40 @@ struct SettingsView: View {
             Toggle("Dismiss when clicking outside", isOn: $settings.dismissOnClickOutside)
             Toggle("Show token usage", isOn: $settings.showTokenUsage)
             Toggle("Launch at login", isOn: launchAtLoginBinding)
+        }
+    }
+
+    private var permissionsSection: some View {
+        SettingsSection("Permissions") {
+            ForEach(PermissionsService.Permission.allCases, id: \.self) { permission in
+                let granted = PermissionsService.isGranted(permission)
+                HStack(spacing: 6) {
+                    Image(systemName: granted ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(granted ? .green : Theme.Colors.subtleText)
+                    Text(permission.label)
+                        .font(Theme.Fonts.body)
+                    Spacer()
+                    Text(granted ? "Granted" : "Not granted")
+                        .font(Theme.Fonts.caption)
+                        .foregroundStyle(Theme.Colors.subtleText)
+                }
+            }
+
+            Text("Asked for once on first launch. macOS ties them to the app's code signature, so an ad-hoc build asks again after every rebuild.")
+                .font(Theme.Fonts.caption)
+                .foregroundStyle(Theme.Colors.subtleText)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack {
+                Button("Request again") {
+                    Task { await PermissionsService.requestAll() }
+                }
+                Button("Open System Settings") {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            }
         }
     }
 

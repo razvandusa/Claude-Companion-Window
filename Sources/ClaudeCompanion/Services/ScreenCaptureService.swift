@@ -32,6 +32,8 @@ enum ScreenCaptureService {
     // MARK: - Interactive captures
 
     static func capture(_ mode: Mode) async -> Outcome {
+        if let denied = permissionFailure() { return denied }
+
         let destination = temporaryFileURL()
         defer { try? FileManager.default.removeItem(at: destination) }
 
@@ -45,7 +47,36 @@ enum ScreenCaptureService {
         }
         arguments.append(destination.path)
 
-        return await run(arguments: arguments, destination: destination, name: defaultName(for: mode))
+        return await run(
+            arguments: arguments,
+            destination: destination,
+            name: defaultName(for: mode),
+            // Only the crosshair and window-picker modes can be escaped out of.
+            // Treating any other failure as "cancelled" is what let a denied
+            // permission pass silently.
+            isCancellable: mode != .fullScreen
+        )
+    }
+
+    // MARK: - Permission
+
+    /// `true` when the app already holds Screen Recording permission.
+    static var hasPermission: Bool { CGPreflightScreenCaptureAccess() }
+
+    /// Asks for Screen Recording once, and describes the problem if it isn't
+    /// granted — rather than letting `screencapture` fail and look like a
+    /// cancelled capture.
+    private static func permissionFailure() -> Outcome? {
+        guard !CGPreflightScreenCaptureAccess() else { return nil }
+
+        // Reports, never re-prompts: the ask happens once at first launch
+        // (``PermissionsService``), and macOS only lets System Settings grant
+        // this afterwards anyway — so prompting here would put a dialog in
+        // front of the user every single time with nothing they could do.
+        logger.error("Screen Recording not granted; capture unavailable")
+        return .failure(
+            "Screen Recording is off. Turn it on in System Settings › Privacy & Security."
+        )
     }
 
     // MARK: - Window of a specific app
@@ -55,6 +86,8 @@ enum ScreenCaptureService {
     /// Used by "Work With": the picked app's window is what gets attached, so
     /// the model sees what the user is actually looking at.
     static func captureWindow(of app: CompanionApp) async -> Outcome {
+        if let denied = permissionFailure() { return denied }
+
         guard let pid = app.processIdentifier else {
             return .failure("\(app.name) isn't running.")
         }
@@ -68,7 +101,10 @@ enum ScreenCaptureService {
         return await run(
             arguments: ["-x", "-o", "-l\(windowID)", destination.path],
             destination: destination,
-            name: "\(app.name).png"
+            name: "\(app.name).png",
+            // Nothing to cancel: there is no interactive step here, so a
+            // failure is a failure and the user needs to hear about it.
+            isCancellable: false
         )
     }
 
@@ -106,16 +142,26 @@ enum ScreenCaptureService {
     private static func run(
         arguments: [String],
         destination: URL,
-        name: String
+        name: String,
+        isCancellable: Bool
     ) async -> Outcome {
         let status = await execute(arguments: arguments)
 
         // A non-zero exit is how `screencapture` reports ESC out of the
-        // crosshair, which is a normal thing for a user to do.
-        guard status == 0 else { return .cancelled }
+        // crosshair — but only the interactive modes can be escaped out of.
+        // Everywhere else it means the capture genuinely failed.
+        guard status == 0 else {
+            guard isCancellable else {
+                logger.error("screencapture exited \(status, privacy: .public)")
+                return .failure("The screen couldn't be captured (screencapture exited \(status)).")
+            }
+            return .cancelled
+        }
 
         guard let data = try? Data(contentsOf: destination), !data.isEmpty else {
-            return .cancelled
+            return isCancellable
+                ? .cancelled
+                : .failure("The capture produced no image.")
         }
 
         guard let attachment = AttachmentLoader.makeImageAttachment(from: data, filename: name) else {

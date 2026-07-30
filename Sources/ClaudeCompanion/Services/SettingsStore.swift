@@ -19,6 +19,7 @@ final class SettingsStore: ObservableObject {
         static let webSearchEnabled = "settings.webSearchEnabled"
         static let panelFrame = "settings.panelFrame"
         static let hasCompletedOnboarding = "settings.hasCompletedOnboarding"
+        static let hasRequestedPermissions = "settings.hasRequestedPermissions"
     }
 
     private let defaults: UserDefaults
@@ -39,7 +40,8 @@ final class SettingsStore: ObservableObject {
             Key.launchAtLogin: false,
             Key.showTokenUsage: true,
             Key.webSearchEnabled: false,
-            Key.hasCompletedOnboarding: false
+            Key.hasCompletedOnboarding: false,
+            Key.hasRequestedPermissions: false
         ])
 
         model = ClaudeModel(rawValue: defaults.string(forKey: Key.model) ?? "") ?? .defaultModel
@@ -52,6 +54,7 @@ final class SettingsStore: ObservableObject {
         showTokenUsage = defaults.bool(forKey: Key.showTokenUsage)
         isWebSearchEnabled = defaults.bool(forKey: Key.webSearchEnabled)
         hasCompletedOnboarding = defaults.bool(forKey: Key.hasCompletedOnboarding)
+        hasRequestedPermissions = defaults.bool(forKey: Key.hasRequestedPermissions)
     }
 
     @Published var model: ClaudeModel {
@@ -95,6 +98,12 @@ final class SettingsStore: ObservableObject {
 
     @Published var hasCompletedOnboarding: Bool {
         didSet { defaults.set(hasCompletedOnboarding, forKey: Key.hasCompletedOnboarding) }
+    }
+
+    /// Set once the first-launch permission prompts have run, so they are not
+    /// repeated every time the app starts.
+    @Published var hasRequestedPermissions: Bool {
+        didSet { defaults.set(hasRequestedPermissions, forKey: Key.hasRequestedPermissions) }
     }
 
     /// `max_tokens` clamped to what the selected model actually accepts.

@@ -32,6 +32,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         environment.settings.hasCompletedOnboarding = true
         if isFirstRun { panelController.show() }
 
+        // Everything the app needs, asked for once. Doing it lazily meant a
+        // system dialog interrupting whatever the user had just started.
+        if !environment.settings.hasRequestedPermissions {
+            environment.settings.hasRequestedPermissions = true
+            Task { await PermissionsService.requestAll() }
+        }
+
         Task {
             await environment.chat.restore()
             if isFirstRun, !environment.chat.status.canSend {
@@ -61,10 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func installStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = NSImage(
-            systemSymbolName: "bubble.left.and.text.bubble.right",
-            accessibilityDescription: AppInfo.name
-        )
+        item.button?.image = Self.statusItemImage()
         item.button?.toolTip = AppInfo.name
 
         let menu = NSMenu()
@@ -101,6 +105,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         item.menu = menu
         statusItem = item
+    }
+
+    /// The mascot, scaled to the menu bar.
+    ///
+    /// Kept in colour rather than made a template image: the pet is the app's
+    /// face, and a flat black silhouette of it is unrecognisable at 18pt.
+    /// Falls back to a symbol if the icon resource is ever missing, so a
+    /// stripped build still shows something clickable.
+    private static func statusItemImage() -> NSImage? {
+        guard let icon = NSImage(named: "AppIcon") else {
+            return NSImage(
+                systemSymbolName: "bubble.left.and.text.bubble.right",
+                accessibilityDescription: AppInfo.name
+            )
+        }
+
+        let size = NSSize(width: 18, height: 18)
+        let scaled = NSImage(size: size, flipped: false) { rect in
+            // Nearest-neighbour: this is pixel art, and smoothing it at this
+            // size turns the eyes into smudges.
+            NSGraphicsContext.current?.imageInterpolation = .none
+            icon.draw(in: rect)
+            return true
+        }
+        scaled.accessibilityDescription = AppInfo.name
+        return scaled
     }
 
     @objc private func togglePanel() {

@@ -2,7 +2,7 @@ import Foundation
 
 /// Static identity for the app, used for logging subsystems and on-disk paths.
 enum AppInfo {
-    static let name = "Claude Companion"
+    static let name = "Claude Pet"
 
     static let bundleIdentifier: String =
         Bundle.main.bundleIdentifier ?? "com.claudecompanion.app"
