@@ -401,7 +401,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
 
     /// Gap between the bottom of the screen's visible area and the panel.
-    private static let launchBottomInset: CGFloat = 40
+    private static let launchBottomInset: CGFloat = 20
 
     /// Moves the panel onto the display the user is currently looking at, but
     /// keeps the remembered size.

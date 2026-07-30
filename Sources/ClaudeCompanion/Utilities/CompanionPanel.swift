@@ -15,7 +15,7 @@ final class CompanionPanel: NSPanel {
     static let minimumSize = NSSize(width: 380, height: 340)
 
     /// Size used the first time the panel is shown.
-    static let defaultSize = NSSize(width: 480, height: 640)
+    static let defaultSize = NSSize(width: 440, height: 640)
 
     init() {
         super.init(
