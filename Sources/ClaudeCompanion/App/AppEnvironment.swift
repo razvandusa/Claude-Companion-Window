@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SwiftUI
 
@@ -22,6 +23,19 @@ final class AppEnvironment: ObservableObject {
     /// Settings are presented as a sheet inside the panel rather than a separate
     /// window, so the companion stays a single surface.
     @Published var isShowingSettings = false
+
+    /// `false` while the panel is the bare composer bar, `true` once there is a
+    /// conversation to show. Drives both what ``RootView`` renders and how tall
+    /// ``PanelController`` makes the window.
+    @Published private(set) var isExpanded = false
+
+    /// Height the composer wants while collapsed, measured by the view.
+    /// The panel follows it so a multi-line draft grows the bar.
+    @Published var collapsedContentHeight: CGFloat = 104
+
+    /// How long the panel can stay closed before the next open starts fresh:
+    /// collapsed, on a new conversation.
+    static let idleResetInterval: TimeInterval = 15 * 60
 
     /// Set once the panel exists; used by menu commands and the header.
     weak var panelController: PanelController? {
@@ -52,6 +66,14 @@ final class AppEnvironment: ObservableObject {
             service: service,
             statusProvider: statusProvider
         )
+
+        // The panel expands the moment there is a turn to show and collapses
+        // again on a new conversation — one rule, so the window can never end
+        // up tall with nothing in it.
+        chat.$conversation
+            .map { !$0.messages.isEmpty }
+            .removeDuplicates()
+            .assign(to: &$isExpanded)
     }
 
     /// Convenience for previews: everything in memory, nothing on disk.

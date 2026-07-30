@@ -21,13 +21,29 @@ struct ComposerView: View {
 
             container
 
-            if settings.showTokenUsage {
+            // The meter belongs to a conversation in progress; on the bare
+            // bar it is just noise under an empty field.
+            if settings.showTokenUsage, environment.isExpanded {
                 TokenUsageView()
                     .padding(.horizontal, 4)
             }
         }
         .padding(.horizontal, Theme.Metrics.horizontalPadding)
         .padding(.bottom, 14)
+        .background {
+            // Reports the collapsed bar's natural height so the panel can size
+            // itself to the composer, including when a draft grows it.
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: ComposerHeightKey.self,
+                    value: proxy.size.height
+                )
+            }
+        }
+        .onPreferenceChange(ComposerHeightKey.self) { height in
+            guard height > 0 else { return }
+            environment.collapsedContentHeight = height + 12
+        }
         .animation(Theme.Animations.quick, value: chat.pendingAttachments.count)
         .animation(Theme.Animations.quick, value: chat.workingWithApps.count)
         .animation(Theme.Animations.quick, value: chat.transientMessage)
@@ -55,13 +71,31 @@ struct ComposerView: View {
         .padding(.horizontal, 12)
         .padding(.top, 11)
         .padding(.bottom, 9)
-        .background(
-            Theme.Colors.composerFill,
-            in: RoundedRectangle(cornerRadius: Theme.Metrics.composerCornerRadius, style: .continuous)
-        )
+        .background { containerBackground }
         .overlay {
             RoundedRectangle(cornerRadius: Theme.Metrics.composerCornerRadius, style: .continuous)
                 .strokeBorder(Theme.Colors.composerStroke)
+        }
+    }
+
+    /// Inside the expanded panel the composer is a lighter well on a surface
+    /// that already exists. Collapsed, it *is* the window, so it has to bring
+    /// the material and tint with it or there would be nothing behind the text.
+    @ViewBuilder
+    private var containerBackground: some View {
+        let shape = RoundedRectangle(
+            cornerRadius: Theme.Metrics.composerCornerRadius,
+            style: .continuous
+        )
+
+        if environment.isExpanded {
+            shape.fill(Theme.Colors.composerFill)
+        } else {
+            ZStack {
+                VisualEffectView(material: .hudWindow)
+                Theme.Colors.surface
+            }
+            .clipShape(shape)
         }
     }
 
@@ -213,6 +247,14 @@ private struct MicButton: View {
             dictation.onTranscript = { text in chat.draft = text }
             dictation.onError = { reason in chat.transientMessage = reason }
         }
+    }
+}
+
+/// Carries the composer's measured height up to the panel.
+private struct ComposerHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 

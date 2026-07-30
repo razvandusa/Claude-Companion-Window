@@ -112,14 +112,15 @@ final class ChatViewModel: ObservableObject {
 
     // MARK: - Lifecycle
 
-    /// Loads persisted transcripts and resumes the most recent one.
+    /// Loads persisted transcripts into the history menu.
+    ///
+    /// The current conversation stays the empty one this view model started
+    /// with: launching lands on the bare composer, not in the middle of
+    /// whatever was being discussed last time. Past conversations are one
+    /// click away under Recent.
     func restore() async {
         do {
-            let loaded = try await store.loadAll()
-            recentConversations = loaded
-            if let latest = loaded.first(where: { $0.hasUserContent }) {
-                conversation = latest
-            }
+            recentConversations = try await store.loadAll()
         } catch {
             logger.error("Failed to load conversations: \(error.localizedDescription, privacy: .public)")
         }

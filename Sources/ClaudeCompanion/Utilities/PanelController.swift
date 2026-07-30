@@ -21,9 +21,34 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// Suppresses click-outside dismissal while a sheet or menu owns the focus.
     private var modalDepth = 0
 
+    /// Mirrors ``AppEnvironment/isExpanded``; the window follows it.
+    private var isExpanded = false
+    /// Height to restore when the panel expands again.
+    private var expandedHeight = CompanionPanel.defaultSize.height
+    /// When the panel was last put away, for the idle reset.
+    private var hiddenAt: Date?
+    private var cancellables = Set<AnyCancellable>()
+
     init(environment: AppEnvironment) {
         self.environment = environment
         super.init()
+
+        environment.$isExpanded
+            .removeDuplicates()
+            .sink { [weak self] expanded in
+                self?.setExpanded(expanded, animated: true)
+            }
+            .store(in: &cancellables)
+
+        // While collapsed the window is exactly as tall as the composer, so a
+        // draft that wraps onto a second line grows the bar with it.
+        environment.$collapsedContentHeight
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                guard let self, !self.isExpanded else { return }
+                self.setExpanded(false, animated: false)
+            }
+            .store(in: &cancellables)
     }
 
     var isVisible: Bool { panel?.isVisible ?? false }
@@ -39,6 +64,8 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
 
     func show() {
+        resetIfIdleTooLong()
+
         let panel = existingOrNewPanel()
 
         if !panel.isVisible {
@@ -64,6 +91,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         guard let panel, panel.isVisible else { return }
         saveFrame(panel, immediately: true)
         removeKeyMonitor()
+        hiddenAt = Date()
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.10
@@ -104,6 +132,85 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
 
         return result
+    }
+
+    /// Starts fresh when the panel has been closed for a long time.
+    ///
+    /// Reopening hours later to yesterday's half-finished conversation is
+    /// almost never what was wanted; reopening to an empty bar is. Anything
+    /// closed and reopened within the window is left exactly as it was.
+    ///
+    /// The old conversation is not lost — it has already been persisted, and
+    /// it stays in the history menu.
+    private func resetIfIdleTooLong() {
+        guard let hiddenAt else { return }
+        guard Date().timeIntervalSince(hiddenAt) >= AppEnvironment.idleResetInterval else {
+            return
+        }
+
+        self.hiddenAt = nil
+        guard environment.chat.hasMessages else { return }
+        environment.chat.startNewConversation()
+    }
+
+    // MARK: - Expansion
+
+    /// Grows the window upward from its bottom edge, or shrinks it back.
+    ///
+    /// The bottom edge is what stays put: the composer is where the user is
+    /// looking and typing, so it must not jump when a reply arrives and the
+    /// transcript appears above it.
+    private func setExpanded(_ expanded: Bool, animated: Bool) {
+        let wasExpanded = isExpanded
+        isExpanded = expanded
+
+        guard let panel else { return }
+
+        if wasExpanded, !expanded {
+            expandedHeight = panel.frame.height
+        }
+
+        let targetHeight = expanded
+            ? max(expandedHeight, CompanionPanel.minimumSize.height)
+            : environment.collapsedContentHeight
+
+        let minimum = expanded ? CompanionPanel.minimumSize : collapsedMinimumSize
+        panel.minSize = minimum
+        panel.contentMinSize = minimum
+        // A bar sized to its content has nothing to resize vertically.
+        if expanded {
+            panel.styleMask.insert(.resizable)
+        } else {
+            panel.styleMask.remove(.resizable)
+        }
+
+        let frame = panel.frame
+        guard abs(frame.height - targetHeight) > 0.5 else { return }
+
+        // origin.y is the bottom edge in AppKit coordinates, so holding it
+        // fixed is what pins the composer and grows the window upward.
+        var target = NSRect(
+            x: frame.minX,
+            y: frame.minY,
+            width: frame.width,
+            height: targetHeight
+        )
+
+        // Growing upward can run off the top of the display.
+        if let visible = panel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame,
+           target.maxY > visible.maxY {
+            target.origin.y = visible.maxY - targetHeight
+        }
+
+        panel.setFrame(target, display: true, animate: animated)
+        panel.invalidateShadow()
+    }
+
+    private var collapsedMinimumSize: NSSize {
+        NSSize(
+            width: CompanionPanel.minimumSize.width,
+            height: environment.collapsedContentHeight
+        )
     }
 
     // MARK: - Panel construction

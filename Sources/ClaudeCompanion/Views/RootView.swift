@@ -11,19 +11,32 @@ struct RootView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ChatHeaderView()
+            // Collapsed, the panel is only the composer: no header to dismiss
+            // a conversation that doesn't exist yet, and no empty transcript.
+            if environment.isExpanded {
+                ChatHeaderView()
 
-            TranscriptView()
+                TranscriptView()
+            } else {
+                Spacer(minLength: 12)
+            }
 
             ComposerView()
         }
+        // Collapsed there is no panel — only the composer, floating on its own.
+        // Drawing the surface and its border around it would put a second box
+        // around a bar that is already a box.
         .background(alignment: .top) {
-            AmbientBackground()
+            if environment.isExpanded {
+                AmbientBackground()
+            }
         }
         .clipShape(RoundedRectangle(cornerRadius: Theme.Metrics.panelCornerRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: Theme.Metrics.panelCornerRadius, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+            if environment.isExpanded {
+                RoundedRectangle(cornerRadius: Theme.Metrics.panelCornerRadius, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+            }
         }
         .overlay {
             if isTargetedForDrop {
